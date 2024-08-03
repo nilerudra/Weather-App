@@ -1,5 +1,4 @@
 import NavigationBar from "./NavigationBar";
-import { Divider } from "@mui/material";
 import { useEffect, useState } from "react";
 import { indianCities } from "../utils/indianCities";
 import axios from "axios";
@@ -39,6 +38,7 @@ export default function Home() {
   const [selectedCity, setSelectedCity] = useState("");
   const [latitude, setLatitude] = useState(null);
   const [longitude, setLongitude] = useState(null);
+  const [sevenDayForecast, setSevenDayForecast] = useState([]);
 
   useEffect(() => {
     if (selectedCity) {
@@ -142,6 +142,29 @@ export default function Home() {
     // Set chance of rain for the first forecasted data point
     const chanceOfRain = limitedForecasts[0]?.pop || 0;
     setChanceOfRain(chanceOfRain);
+
+    // Process 7-day forecast
+    const dailyForecasts = {};
+
+    forecasts.forEach((forecast) => {
+      const forecastDate = new Date(forecast.dt * 1000);
+      const forecastDateStr = forecastDate.toISOString().split("T")[0];
+
+      if (!dailyForecasts[forecastDateStr]) {
+        dailyForecasts[forecastDateStr] = [];
+      }
+
+      dailyForecasts[forecastDateStr].push(forecast);
+    });
+
+    const weeklyForecasts = Object.keys(dailyForecasts)
+      .slice(0, 7)
+      .map((date) => {
+        const dayForecasts = dailyForecasts[date];
+        return dayForecasts[0]; // You can customize this to show aggregated data if needed
+      });
+
+    setSevenDayForecast(weeklyForecasts);
   };
 
   const getLocation = () => {
@@ -392,32 +415,50 @@ export default function Home() {
           }}
         >
           <p style={{ fontSize: "15px" }}>7 - DAY FORECAST</p>
-          <div>
-            <p>Today</p>
-          </div>
-          <Divider sx={{ borderColor: "#666" }} />
-          <div>
-            <p>Tuesday</p>
-          </div>
-          <Divider sx={{ borderColor: "#666" }} />
-          <div>
-            <p>Wednesday</p>
-          </div>
-          <Divider sx={{ borderColor: "#666" }} />
-          <div>
-            <p>Thursday</p>
-          </div>
-          <Divider sx={{ borderColor: "#666" }} />
-          <div>
-            <p>Friday</p>
-          </div>
-          <Divider sx={{ borderColor: "#666" }} />
-          <div>
-            <p>Saturday</p>
-          </div>
-          <Divider sx={{ borderColor: "#666" }} />
-          <div>
-            <p>Sunday</p>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "10px",
+            }}
+          >
+            {sevenDayForecast.map((data, index) => {
+              const date = new Date(data.dt * 1000);
+              const weekday = date.toLocaleDateString("en-US", {
+                weekday: "long",
+              });
+              const weatherIcon =
+                allIcons[data.weather[0].icon] || allIcons["01d"];
+              const weatherStatus = data.weather[0].description;
+
+              return (
+                <div
+                  key={index}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "20px",
+                    padding: "20px 0",
+                    borderBottom: "1px solid #666",
+                  }}
+                >
+                  <p style={{ flex: 1, margin: "0", fontSize: "12px" }}>
+                    {weekday}
+                  </p>
+                  <img
+                    src={weatherIcon}
+                    alt={weatherStatus}
+                    style={{ width: "40px", height: "40px" }}
+                  />
+                  <p style={{ flex: 1, fontSize: "12px", color: "#dde0e4" }}>
+                    {weatherStatus}
+                  </p>
+                  <p style={{ flex: 1, fontSize: "14px", fontWeight: "bold" }}>
+                    {data.main.temp}°
+                  </p>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
