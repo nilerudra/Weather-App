@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-export default function NavigationBar() {
+export default function NavigationBar({ onLocationClick }) {
   const [hoveredItem, setHoveredItem] = useState(null);
 
   const logo =
@@ -60,6 +60,18 @@ export default function NavigationBar() {
     <div style={sidebarStyle}>
       <img src={logo} alt="weather app" style={logoStyle} />
       <ul style={menuStyle}>
+        <li
+          style={menuItemStyle(hoveredItem === "Location")}
+          onMouseEnter={() => setHoveredItem("Location")}
+          onMouseLeave={() => setHoveredItem(null)}
+          onClick={onLocationClick}
+        >
+          <i
+            className="fas fa-location"
+            style={iconStyle(hoveredItem === "Location")}
+          ></i>
+          Location
+        </li>
         <li
           style={menuItemStyle(hoveredItem === "Weather")}
           onMouseEnter={() => setHoveredItem("Weather")}

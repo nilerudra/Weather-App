@@ -1,85 +1,148 @@
 import NavigationBar from "./NavigationBar";
 import { Divider } from "@mui/material";
-import axios from "axios";
 import { useEffect, useState } from "react";
-// import humidity_icon from "../assets/humidity.png";
+import { indianCities } from "../utils/indianCities";
+import axios from "axios";
 import rain_icon from "../assets/rain.png";
-// import sunrise_icon from "../assets/sunrise.png";
 import drizzle_icon from "../assets/drizzle.png";
-// import wind_icon from "../assets/wind.png";
 import sun_icon from "../assets/sun.png";
 import cloud_icon from "../assets/cloudy.png";
 import snow_icon from "../assets/snow.png";
 import night_icon from "../assets/night.png";
 
+const api_key = "b51f3e4f54b8725b78c799e07330733f";
+
+const allIcons = {
+  "01d": sun_icon,
+  "01n": night_icon,
+  "02d": cloud_icon,
+  "02n": cloud_icon,
+  "03d": cloud_icon,
+  "03n": cloud_icon,
+  "04d": drizzle_icon,
+  "04n": drizzle_icon,
+  "09d": rain_icon,
+  "09n": rain_icon,
+  "10d": rain_icon,
+  "10n": rain_icon,
+  "13d": snow_icon,
+  "13n": snow_icon,
+};
+
 export default function Home() {
   const [forecast, setForecast] = useState([]);
   const [loading, setLoading] = useState(true);
-  const api_key = "b51f3e4f54b8725b78c799e07330733f";
+  const [chanceOfRain, setChanceOfRain] = useState(0);
+  const [city, setCityName] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const [suggestions, setSuggestions] = useState([]);
+  const [selectedCity, setSelectedCity] = useState("");
   const [latitude, setLatitude] = useState(null);
   const [longitude, setLongitude] = useState(null);
-  const [city, setCityName] = useState("");
 
-  const allIcons = {
-    "01d": sun_icon,
-    "01n": night_icon,
-    "02d": cloud_icon,
-    "02n": cloud_icon,
-    "03d": cloud_icon,
-    "03n": cloud_icon,
-    "04d": drizzle_icon,
-    "04n": drizzle_icon,
-    "09d": rain_icon,
-    "09n": rain_icon,
-    "10d": rain_icon,
-    "10n": rain_icon,
-    "13d": snow_icon,
-    "13n": snow_icon,
+  useEffect(() => {
+    if (selectedCity) {
+      fetchWeatherDataByCity(selectedCity);
+    } else if (latitude && longitude) {
+      fetchWeatherDataByLocation();
+    }
+  }, [selectedCity, latitude, longitude]);
+
+  useEffect(() => {
+    if (searchInput) {
+      const filteredSuggestions = indianCities.filter((city) =>
+        city.toLowerCase().includes(searchInput.toLowerCase())
+      );
+      setSuggestions(filteredSuggestions);
+    } else {
+      setSuggestions([]);
+    }
+  }, [searchInput]);
+
+  const handleInputChange = (event) => {
+    setSearchInput(event.target.value);
   };
 
-  useEffect(() => {
-    getLocation();
-  }, []);
+  const handleSuggestionClick = (city) => {
+    setSearchInput(""); // Clear the search input
+    setSelectedCity(city);
+    setSuggestions([]);
+  };
 
-  useEffect(() => {
-    if (latitude && longitude) {
-      const fetchWeatherData = async () => {
-        try {
-          const response = await axios.get(
-            `https://api.openweathermap.org/data/2.5/forecast?lat=${latitude}&lon=${longitude}&units=metric&appid=${api_key}`
-          );
-          console.log("city", response.data.city.name);
-          setCityName(response.data.city.name);
-          const forecasts = response.data.list;
-          const now = new Date();
-          const todayDate = now.toISOString().split("T")[0];
-          const tomorrowDate = new Date(now.setDate(now.getDate() + 1))
-            .toISOString()
-            .split("T")[0];
-
-          // Filter data for today and tomorrow
-          const relevantForecasts = forecasts.filter((forecast) => {
-            const forecastDate = new Date(forecast.dt * 1000);
-            const forecastDateStr = forecastDate.toISOString().split("T")[0];
-            return (
-              forecastDateStr === todayDate || forecastDateStr === tomorrowDate
-            );
-          });
-
-          // Ensure we have exactly 6 forecasts
-          const limitedForecasts = relevantForecasts.slice(0, 6);
-
-          setForecast(limitedForecasts);
-        } catch (error) {
-          console.error("Error fetching weather data:", error);
-        } finally {
-          setLoading(false);
+  const handleKeyDown = async (event) => {
+    if (event.key === "Enter") {
+      if (searchInput) {
+        // Check if the city is in suggestions
+        const cityFound = suggestions.includes(searchInput);
+        if (cityFound) {
+          setSelectedCity(searchInput);
+        } else {
+          // If the city is not in suggestions, still fetch data for it
+          setSelectedCity(searchInput);
+          await fetchWeatherDataByCity(searchInput);
         }
-      };
-
-      fetchWeatherData();
+        setSearchInput(""); // Clear the search input
+      } else {
+        getLocation();
+      }
+      setSuggestions([]); // Clear suggestions
     }
-  }, [latitude, longitude]);
+  };
+
+  const fetchWeatherDataByCity = async (cityName) => {
+    try {
+      setLoading(true);
+      const response = await axios.get(
+        `https://api.openweathermap.org/data/2.5/forecast?q=${cityName}&units=metric&appid=${api_key}`
+      );
+      setCityName(response.data.city.name);
+      const forecasts = response.data.list;
+      processWeatherData(forecasts);
+    } catch (error) {
+      console.error("Error fetching weather data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchWeatherDataByLocation = async () => {
+    try {
+      setLoading(true);
+      const response = await axios.get(
+        `https://api.openweathermap.org/data/2.5/forecast?lat=${latitude}&lon=${longitude}&units=metric&appid=${api_key}`
+      );
+      setCityName(response.data.city.name);
+      const forecasts = response.data.list;
+      processWeatherData(forecasts);
+    } catch (error) {
+      console.error("Error fetching weather data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const processWeatherData = (forecasts) => {
+    const now = new Date();
+    const todayDate = now.toISOString().split("T")[0];
+    const tomorrowDate = new Date(now.setDate(now.getDate() + 1))
+      .toISOString()
+      .split("T")[0];
+
+    // Filter data for today and tomorrow
+    const relevantForecasts = forecasts.filter((forecast) => {
+      const forecastDate = new Date(forecast.dt * 1000);
+      const forecastDateStr = forecastDate.toISOString().split("T")[0];
+      return forecastDateStr === todayDate || forecastDateStr === tomorrowDate;
+    });
+
+    // Ensure we have exactly 6 forecasts
+    const limitedForecasts = relevantForecasts.slice(0, 6);
+    setForecast(limitedForecasts);
+
+    // Set chance of rain for the first forecasted data point
+    const chanceOfRain = limitedForecasts[0]?.pop || 0;
+    setChanceOfRain(chanceOfRain);
+  };
 
   const getLocation = () => {
     if (navigator.geolocation) {
@@ -97,8 +160,12 @@ export default function Home() {
     }
   };
 
+  useEffect(() => {
+    getLocation();
+  }, []);
+
   if (loading) return <p>Loading...</p>;
-  if (!latitude || !longitude) return <p>Unable to get location.</p>;
+  if (!latitude && !longitude) return <p>Unable to get location.</p>;
 
   const textStyle = {
     color: "white",
@@ -137,7 +204,30 @@ export default function Home() {
       fontSize: "12px",
       color: "#dde0e4",
     },
+    suggestionBox: {
+      marginTop: "5%",
+      position: "absolute",
+      backgroundColor: "#202b3b",
+      color: "#fff",
+      width: "100%",
+      maxWidth: "1200px",
+      borderRadius: "8px",
+      boxShadow: "0 4px 8px rgba(0, 0, 0, 0.2)",
+      zIndex: 1000,
+      maxHeight: "200px",
+      overflowY: "auto",
+    },
+    suggestionItem: {
+      padding: "10px",
+      cursor: "pointer",
+    },
   };
+
+  const handleLocationClick = () => {
+    getLocation();
+  };
+
+  const currentWeatherIcon = chanceOfRain > 0 ? rain_icon : sun_icon;
 
   return (
     <>
@@ -147,9 +237,10 @@ export default function Home() {
           height: "100vh",
           padding: "20px",
           backgroundColor: "#0b131e",
+          position: "relative",
         }}
       >
-        <NavigationBar />
+        <NavigationBar onLocationClick={handleLocationClick} />
         <div
           style={{
             flex: 3,
@@ -162,11 +253,15 @@ export default function Home() {
             style={{
               display: "flex",
               justifyContent: "center",
+              position: "relative",
             }}
           >
             <input
               type="text"
               placeholder="Search..."
+              value={searchInput}
+              onChange={handleInputChange}
+              onKeyDown={handleKeyDown}
               style={{
                 width: "100%",
                 maxWidth: "1200px",
@@ -179,14 +274,21 @@ export default function Home() {
                 fontSize: "16px",
               }}
             />
-            <style>
-              {`
-                input::placeholder {
-                    color: #fff; /* Placeholder text color */
-                }
-                `}
-            </style>
+            {suggestions.length > 0 && (
+              <div style={styles.suggestionBox}>
+                {suggestions.map((city, index) => (
+                  <div
+                    key={index}
+                    style={styles.suggestionItem}
+                    onClick={() => handleSuggestionClick(city)}
+                  >
+                    {city}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
+
           <div
             style={{
               flex: 1,
@@ -209,8 +311,14 @@ export default function Home() {
               >
                 {city}
               </p>
-              <p style={{ ...textStyle, color: "#ccc", fontSize: "12px" }}>
-                Chance of rain - 0%
+              <p
+                style={{
+                  ...textStyle,
+                  fontSize: "12px",
+                  color: "#ccc",
+                }}
+              >
+                Chance of rain - {chanceOfRain}%
               </p>
               <p
                 style={{
@@ -221,12 +329,12 @@ export default function Home() {
                   color: "#dde0e4",
                 }}
               >
-                30°
+                {forecast[0].main.temp}°
               </p>
             </div>
             <img
-              src={sun_icon}
-              alt="Sun Icon"
+              src={currentWeatherIcon}
+              alt="Weather Icon"
               style={{
                 width: "100px",
               }}
@@ -246,7 +354,7 @@ export default function Home() {
               {forecast.map((data, index) => {
                 const date = new Date(data.dt * 1000);
                 const weatherIcon =
-                  allIcons[data.weather[0].icon] || allIcons["01d"]; // Default to sun_icon if not found
+                  allIcons[data.weather[0].icon] || allIcons["01d"];
                 const weatherStatus = data.weather[0].description;
 
                 return (
